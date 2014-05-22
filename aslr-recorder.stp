@@ -1,0 +1,43 @@
+# Miroslav Franc, Red Hat Inc., 2014
+#
+# stap -o /tmp/replay.stp aslr-recorder.stp -c '/bin/cat /proc/self/maps'
+# stap -g /tmp/replay.stp -c '/bin/cat /proc/self/maps'
+
+global i = 0
+
+probe begin
+{
+	print_start ()
+}
+
+probe kernel.function ("get_random_int@drivers/char/random.c").return
+{
+	printf ("\t%s%u%s%u  # %s\n", "array[", i++, "] = ", $return, probefunc())
+}
+
+probe end
+{
+	print_end ()
+}
+
+### helper functions ###
+
+function print_start ()
+{
+	printf ("# stap -g /tmp/replay.stp -c '/bin/cat /proc/self/maps'\n\n")
+	printf ("global array\n")
+	printf ("global i = 0\n\n")
+	printf ("probe begin\n")
+	printf ("{\n")
+}
+
+function print_end ()
+{
+	printf ("}\n\n")
+	printf ("probe kernel.function (\"get_random_int@drivers/char/random.c\").return\n")
+	printf ("{\n")
+	printf ("\tif (i < %u) {\n", i)
+	printf ("\t\t$return = array[i++]\n")
+	printf ("\t}\n")
+	printf ("}\n")
+}
